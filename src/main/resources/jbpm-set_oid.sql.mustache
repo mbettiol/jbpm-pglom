@@ -1,0 +1,68 @@
+--------------------------------------------------------
+--------------------------------------------------------
+--  VACUUM_LO SAFE COLUMNS AND SYNC TRIGGERS - BEGIN  --
+--------------------------------------------------------
+--------------------------------------------------------
+  
+-- CREATE SAFE OID COLUMNS
+ 
+{{#wrongTypeColumns}}
+ALTER TABLE {{tableName}} ADD COLUMN {{targetColumnName}} oid;
+{{/wrongTypeColumns}}
+
+
+-- DROP COLUMNS (commented)
+/*
+{{#wrongTypeColumns}}
+ALTER TABLE {{tableName}} DROP COLUMN {{targetColumnName}};
+{{/wrongTypeColumns}}
+*/
+
+-- UPDATE EXISTING DATA (commented)
+
+/* 
+{{#wrongTypeColumns}}
+UPDATE {{tableName}} SET {{targetColumnName}} = {{sourceColumnName}}::oid;
+{{/wrongTypeColumns}}
+*/
+ 
+-- CREATE COPY-VALUE FUNCTIONS AND TRIGGERS
+
+{{#wrongTypeColumns}}
+/*
+ *  {{tableName}}.{{sourceColumnName}}
+ */
+ 
+CREATE FUNCTION {{functionName}}() RETURNS trigger
+    LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF (TG_OP = 'UPDATE' OR TG_OP = 'INSERT') THEN 
+		NEW.{{targetColumnName}} = NEW.{{sourceColumnName}}::oid;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER {{triggerName}} 
+	BEFORE INSERT OR UPDATE ON {{tableName}} 
+	FOR EACH ROW EXECUTE PROCEDURE {{functionName}}();
+
+{{/wrongTypeColumns}}
+
+/*
+   ## CLEANUP
+   
+{{#wrongTypeColumns}}
+   DROP TRIGGER IF EXISTS {{triggerName}} ON {{tableName}};
+   DROP FUNCTION IF EXISTS {{functionName}}();
+   
+{{/wrongTypeColumns}}
+*/
+
+------------------------------------------------------
+------------------------------------------------------
+--  VACUUM_LO SAFE COLUMNS AND SYNC TRIGGERS - END  --
+------------------------------------------------------
+------------------------------------------------------
+

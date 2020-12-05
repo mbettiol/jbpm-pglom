@@ -1,0 +1,55 @@
+----------------------------------------------------
+----------------------------------------------------
+--  SYNC CLEANUP OF UNUSED LARGE OBJECTS - BEGIN  --
+----------------------------------------------------
+----------------------------------------------------
+
+{{#unlinkLargeObjectTables}}
+
+CREATE FUNCTION {{cleanupLoFunctionName}}() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+	IF (TG_OP = 'UPDATE') THEN
+        {{#tableColumns}}
+        IF(OLD.{{.}} IS NOT NULL AND OLD.{{.}} IS DISTINCT FROM NEW.{{.}}) THEN
+                PERFORM lo_unlink(OLD.{{.}});
+        END IF;
+        {{/tableColumns}}
+        RETURN NEW;
+    ELSEIF (TG_OP = 'DELETE') THEN
+        {{#tableColumns}}
+        IF (OLD.{{.}} is not null) THEN 
+        	PERFORM lo_unlink(OLD.{{.}});
+        END IF;
+        {{/tableColumns}}
+        RETURN OLD;
+    ELSE
+    	RAISE EXCEPTION 'Trigger OP must be ''UPDATE'' or ''DELETE''';
+    END IF;
+END;
+$$;
+
+CREATE TRIGGER {{cleanupLoTriggerName}} 
+  AFTER UPDATE OR DELETE 
+  ON {{tableName}}
+  FOR EACH ROW EXECUTE 
+  PROCEDURE {{cleanupLoFunctionName}}();
+  
+{{/unlinkLargeObjectTables}}
+
+/*
+   ## CLEANUP
+   
+{{#unlinkLargeObjectTables}}
+   DROP TRIGGER IF EXISTS {{cleanupLoTriggerName}} ON {{tableName}};
+   DROP FUNCTION IF EXISTS {{cleanupLoFunctionName}}();
+   
+{{/unlinkLargeObjectTables}}
+*/
+
+--------------------------------------------------
+--------------------------------------------------
+--  SYNC CLEANUP OF UNUSED LARGE OBJECTS - END  --
+--------------------------------------------------
+--------------------------------------------------
